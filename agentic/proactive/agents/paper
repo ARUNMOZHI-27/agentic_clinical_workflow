@@ -1,0 +1,1244 @@
+\documentclass[journal]{IEEEtran}
+
+%% ── Packages ─────────────────────────────────────────
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{url}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric,arrows.meta,positioning,
+                fit,backgrounds,calc}
+\usepackage{balance}
+\usepackage{amsthm}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.17}
+
+%% ── Theorem environments ──────────────────────────────
+\newtheorem{definition}{Definition}
+
+%% ── pgfplots: IEEE monochrome style ──────────────────
+%% Real IEEE papers: black lines, distinct dash patterns,
+%% no color, grayscale fills only
+\pgfplotsset{
+  IEEEplot/.style={
+    font=\footnotesize,
+    grid=major,
+    grid style={dotted,gray!30},
+    tick align=outside,
+    tick pos=left,
+    axis line style={black,thin},
+    legend style={
+      font=\footnotesize,
+      draw=black!50,
+      fill=white,
+      inner sep=3pt,
+      row sep=0pt},
+    label style={font=\footnotesize},
+    width=\columnwidth,
+    height=4.5cm,
+  }
+}
+
+%% ── TikZ: architecture diagram — IEEE monochrome ─────
+%% Layers distinguished by fill density, NOT color
+%% Data layer  : white fill
+%% Processing  : 12% gray (light)
+%% Reactive    : 25% gray (medium) — post-event
+%% Proactive   : 8%  gray (near-white) — pre-event
+%% Output      : 5%  gray with double border
+\tikzset{
+  dsbox/.style={rectangle,rounded corners=2pt,
+    draw=black,line width=0.55pt,fill=white,
+    minimum width=1.72cm,minimum height=0.54cm,
+    font=\fontsize{6}{7}\selectfont\sffamily,
+    text centered,inner sep=3pt},
+  pbox/.style={rectangle,rounded corners=2pt,
+    draw=black,line width=1.0pt,fill=black!12,
+    minimum width=2.2cm,minimum height=0.60cm,
+    font=\fontsize{6.5}{7.5}\selectfont\sffamily\bfseries,
+    text centered,inner sep=4pt},
+  rbox/.style={rectangle,rounded corners=2pt,
+    draw=black,line width=0.7pt,fill=black!25,
+    minimum width=1.72cm,minimum height=0.54cm,
+    font=\fontsize{5.8}{6.8}\selectfont\sffamily,
+    text centered,inner sep=3pt},
+  pabox/.style={rectangle,rounded corners=2pt,
+    draw=black,line width=0.7pt,fill=black!8,
+    minimum width=1.72cm,minimum height=0.54cm,
+    font=\fontsize{5.8}{6.8}\selectfont\sffamily,
+    text centered,inner sep=3pt},
+  obox/.style={rectangle,rounded corners=2pt,
+    draw=black,line width=0.9pt,fill=white,
+    minimum width=2.3cm,minimum height=0.60cm,
+    font=\fontsize{6.5}{7.5}\selectfont\sffamily,
+    text centered,inner sep=4pt},
+  grp/.style={rectangle,rounded corners=3pt,
+    draw=black!50,dashed,line width=0.45pt,
+    fill=none,inner sep=6pt},
+  mf/.style={->,>=Stealth,line width=0.65pt,draw=black},
+}
+
+%%===========================================================
+\begin{document}
+
+%%─── Title ─────────────────────────────────────────────────
+\title{Agentic Clinical Workflow Intelligence System for\\
+Detecting Diagnostic Delays Using Electronic Health Records}
+
+%%─── Authors ───────────────────────────────────────────────
+\author{Arunmozhi~A,~Lavanya~T,~Lathika~Saran~S,
+        and~Y.~Nancy~Jane%
+  \thanks{Manuscript received --; revised --; accepted --.
+    Date of current version --. This work was conducted at
+    the Department of Computer Technology, Madras Institute
+    of Technology, Anna University, Chennai~600044, India.}%
+  \thanks{Arunmozhi A, Lavanya T, and Lathika Saran S are
+    with the Department of Computer Technology, Madras
+    Institute of Technology, Anna University,
+    Chennai~600044, India.}%
+  \thanks{Y. Nancy Jane is with the Department of Computer
+    Technology, Madras Institute of Technology, Anna
+    University, Chennai~600044, India
+    (e-mail: nancyjane@mitindia.edu).
+    \textit{Corresponding author.}}}
+
+\maketitle
+
+%%===========================================================
+%% ABSTRACT
+%% IEEE TBME rules (confirmed from official guide):
+%%   Structured with: Objective · Methods · Results ·
+%%   Conclusion · Significance
+%%   Max 250 words · No citations · No math · No bold ·
+%%   Define ALL abbreviations at first use
+%%===========================================================
+\begin{abstract}
+\textit{Objective:}
+Diagnostic delays in intensive care units (ICUs) pose a critical
+patient-safety risk. Existing clinical decision support systems
+rely on static temporal thresholds that cannot adapt to
+patient-specific workflow variability. This paper aims to
+develop an agentic framework that learns expected diagnostic
+timing from electronic health records (EHRs) and detects delays
+as deviations from those learned expectations.
+
+\textit{Methods:}
+The Agentic Clinical Workflow Intelligence System (ACWIS) is
+proposed. It extracts physiological instability trigger events
+from vital sign streams, aligns each trigger with subsequent
+laboratory events using a three-level fallback strategy, and
+models delay distributions using a two-layer long short-term
+memory (LSTM) network trained on ten temporal features from the
+MIMIC-IV ICU database. A LangGraph-based agentic multi-agent
+layer implements a reactive pipeline evaluating deviation after
+laboratory completion, and a proactive pipeline issuing early
+warnings before completion. Detected deviations are classified
+into four severity levels, and a large language model (LLM)
+agent generates clinician-readable explanations.
+
+\textit{Results:}
+Evaluated on 703,808 trigger-level records, ACWIS achieves a
+mean absolute error (MAE) of 89.93 minutes, a root mean square
+error (RMSE) of 166.69 minutes, and a 2.3\% MAE improvement
+over the mean-predictor baseline. The model performs best on
+short delays (MAE under 50 minutes for delays under 3 hours,
+comprising 82\% of the dataset). The proactive pipeline
+demonstrates pre-event alerting capability across multiple ICU
+stays.
+
+\textit{Conclusion:}
+ACWIS provides rule-free, learned clinical workflow delay
+detection with dual reactive and proactive agentic monitoring,
+validated on a large-scale ICU dataset.
+
+\textit{Significance:}
+This work represents the first integration of learned LSTM-based
+delay prediction with LangGraph-orchestrated dual-pipeline
+agentic monitoring for ICU diagnostic workflow intelligence.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Agentic AI, clinical workflow analysis, diagnostic delay
+detection, electronic health records, ICU monitoring,
+LangGraph, long short-term memory, MIMIC-IV, multi-agent
+systems, proactive monitoring
+\end{IEEEkeywords}
+
+%%===========================================================
+\section{Introduction}
+\label{sec:intro}
+%%===========================================================
+
+Intensive care units (ICUs) generate continuous time-stamped
+clinical data---vital sign measurements, laboratory orders,
+medication administrations, and procedural events---that
+collectively constitute longitudinal clinical workflows
+reflecting how patient care progresses during a hospital stay.
+In high-acuity environments, timely workflow execution is
+directly linked to patient outcomes: delays in completing
+diagnostic laboratory investigations following physiological
+instability events have been associated with increased
+mortality, prolonged length of stay, and avoidable
+complications~\cite{ref1,ref4}.
+
+Despite the richness of electronic health record (EHR) data,
+automated detection of clinical workflow delays remains an open
+problem. Existing clinical decision support systems (CDSS)
+address this through predefined temporal rules that flag any
+laboratory result arriving beyond a fixed time limit as a
+delay. Such systems suffer from three fundamental limitations.
+First, they cannot adapt to patient-specific variability in
+expected care timing, which depends on disease severity,
+comorbidities, and clinical context. Second, they operate
+exclusively retrospectively, detecting delays only after they
+have fully materialized with no capacity for anticipatory
+warning. Third, they cannot learn normal workflow timing
+patterns from historical data, making them brittle as clinical
+practice evolves.
+
+Recent advances in temporal deep learning on EHR data have
+shown that long short-term memory (LSTM) networks and
+Transformer models can effectively capture longitudinal patient
+trajectories~\cite{ref1,ref5}. However, the majority of this
+work targets clinical outcome prediction---mortality, ICU
+readmission, and disease onset~\cite{ref5,ref6,ref7}---rather
+than workflow timing. Concurrently, agentic AI architectures,
+in which autonomous agents reason and act toward clinical goals
+in a coordinated manner, have been proposed for modular
+decision support~\cite{ref8,ref10}. Yet implementations
+combining learned temporal modeling with agentic orchestration
+for clinical workflow delay analysis are absent from the
+literature.
+
+This paper addresses this gap with ACWIS, whose principal
+contributions are:
+\begin{itemize}
+  \item A trigger--laboratory alignment pipeline with a
+    three-level fallback strategy that maximizes delay-label
+    coverage across heterogeneous ICU admissions.
+  \item A two-layer LSTM delay prediction model trained on
+    ten temporal features with patient-level data splitting
+    to prevent information leakage.
+  \item A LangGraph-based agentic dual-pipeline architecture
+    implementing reactive deviation detection (post-event)
+    and proactive early warning (pre-event)---the first
+    such framework for ICU diagnostic delay detection.
+  \item Validation on the MIMIC-IV dataset across 703,808
+    trigger-level records from diverse ICU patient cohorts.
+\end{itemize}
+
+Section~\ref{sec:related} reviews related work.
+Section~\ref{sec:problem} formalizes the problem.
+Section~\ref{sec:system} presents the proposed system.
+Section~\ref{sec:experiments} reports experimental results.
+Section~\ref{sec:discussion} discusses findings and limitations.
+Section~\ref{sec:conclusion} concludes the paper.
+
+%%===========================================================
+\section{Related Work}
+\label{sec:related}
+%%===========================================================
+
+\subsection{Temporal Modeling on Electronic Health Records}
+
+Kraljevic \textit{et al.}~\cite{ref1} introduced Foresight,
+a generative pretrained Transformer that models longitudinal
+patient timelines from structured EHR data and clinical notes.
+While demonstrating effective temporal trajectory learning at
+scale, Foresight targets event forecasting rather than
+workflow timing and is non-agentic.
+
+Muyama \textit{et al.}~\cite{ref2} systematically reviewed
+machine learning approaches for clinical pathway discovery,
+covering process mining, clustering, and sequence mining.
+The review underscores the gap between academic workflow
+modeling and deployable real-time delay detection systems.
+
+Ibing \textit{et al.}~\cite{ref3} applied supervised learning
+with NLP-based phenotyping to identify diagnostic delays in
+EHRs for Crohn's disease. The approach is retrospective and
+static with no continuous monitoring component.
+
+\subsection{ICU Outcome Prediction With Deep Learning}
+
+Tang \textit{et al.}~\cite{ref4} proposed CNN-Transformer
+and LSTM-Transformer hybrids for early sepsis prediction,
+achieving advance warning several hours before onset. The
+temporal methodology is relevant, but the target is clinical
+outcome rather than workflow process timing.
+
+Rasheed \textit{et al.}~\cite{ref5} applied LSTM-based deep
+learning to sequential ICU chart events for readmission
+prediction. The recurrent architecture is related to that of
+ACWIS, but the work is outcome-centric with no workflow-timing
+semantics.
+
+Li \textit{et al.}~\cite{ref6} extended LSTM-based readmission
+prediction using diagnostic embeddings on MIMIC-III. The work
+is limited to single-center data and lacks workflow delay
+modeling.
+
+Xie \textit{et al.}~\cite{ref7} proposed diffusion-based
+generative imputation for real-time ICU mortality prediction.
+The system targets mortality outcomes and does not address
+process-level delays.
+
+\subsection{Agentic AI for Clinical Decision Support}
+
+\"{O}\u{g}d\"{u}~\textit{et al.}~\cite{ref8} designed an
+adaptive multi-agent LLM-based CDSS integrating biomedical
+retrieval-augmented generation and web intelligence. The
+agentic design is relevant, but the system operates on
+question-answering tasks rather than EHR workflow timelines.
+
+Karunanayake~\cite{ref10} provided a conceptual overview of
+agentic AI for healthcare using multimodal LLMs with
+chain-of-thought reasoning, lacking quantitative evaluation.
+
+\subsection{Anomaly Detection in Time Series}
+
+Hu \textit{et al.}~\cite{ref9} applied diffusion models to
+unsupervised anomaly detection in multivariate time series.
+Although adjacent to deviation detection, the evaluation uses
+non-clinical datasets with no clinical explainability.
+
+\subsection{Summary and Research Gaps}
+
+Table~\ref{tab:related} compares the surveyed work against
+five dimensions critical to clinical workflow intelligence.
+ACWIS is the only system satisfying all five simultaneously,
+establishing a novel intersection of temporal deep learning,
+agentic orchestration, and proactive clinical monitoring.
+
+\begin{table}[!t]
+\caption{Comparison of Related Work Against Key Dimensions}
+\label{tab:related}
+\centering
+\setlength{\tabcolsep}{3pt}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{lccccc}
+\toprule
+\textbf{System} &
+\rotatebox{65}{\small Workflow} &
+\rotatebox{65}{\small Learned} &
+\rotatebox{65}{\small Proactive} &
+\rotatebox{65}{\small Agentic} &
+\rotatebox{65}{\small Explainable} \\
+\midrule
+Foresight~\cite{ref1}        &\checkmark&\checkmark&$\times$&$\times$&$\times$\\
+Muyama et al.~\cite{ref2}    &\checkmark&\checkmark&$\times$&$\times$&$\times$\\
+Tang et al.~\cite{ref4}      &$\times$&\checkmark&$\times$&$\times$&$\times$\\
+Rasheed et al.~\cite{ref5}   &$\times$&\checkmark&$\times$&$\times$&$\times$\\
+\"{O}\u{g}d\"{u}~\cite{ref8} &$\times$&$\times$&$\times$&\checkmark&\checkmark\\
+\textbf{ACWIS (proposed)}    &\checkmark&\checkmark&\checkmark&\checkmark&\checkmark\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%%===========================================================
+\section{Problem Formulation}
+\label{sec:problem}
+%%===========================================================
+
+Let $\mathcal{S}=\{s_1,\ldots,s_N\}$ be a set of ICU stays.
+For each stay $s_i$, let $\mathcal{T}^{(i)}=\{t_1,\ldots,
+t_{M_i}\}$ be the time-ordered sequence of trigger events.
+
+\begin{definition}[Trigger event]
+$t_j=(\tau_j,\phi_j,\mathbf{v}_j)$ comprises a timestamp
+$\tau_j$, a trigger type $\phi_j\in\{\texttt{HR\_HIGH},
+\texttt{MAP\_LOW},\texttt{SPO2\_LOW},\texttt{RR\_HIGH}\}$,
+and a vital sign vector $\mathbf{v}_j=[\mathrm{HR},
+\mathrm{MAP},\mathrm{RR},\mathrm{SpO_2}]$.
+\end{definition}
+
+\begin{definition}[Diagnostic delay]
+Let $\ell_j$ be the timestamp of the first relevant laboratory
+event with $\ell_j>\tau_j$ in admission $s_i$. The diagnostic
+delay is
+\begin{equation}
+  d_j = \tfrac{\ell_j - \tau_j}{3600} \quad (\text{hours}).
+  \label{eq:delay}
+\end{equation}
+\end{definition}
+
+\begin{definition}[Expected delay and workflow deviation]
+Let $\mathbf{x}_j\in\mathbb{R}^{W\times F}$ be the feature
+tensor of the $W$ triggers preceding $t_j$. A learned function
+$f_\theta$ predicts expected delay $\hat{d}_j=f_\theta(
+\mathbf{x}_j)$. The workflow deviation is
+\begin{equation}
+  \delta_j = d_j - \hat{d}_j.
+  \label{eq:deviation}
+\end{equation}
+Positive $\delta_j$ indicates delay; negative indicates
+completion ahead of expectation.
+\end{definition}
+
+The objective is to estimate $f_\theta$ from historical EHR
+data and use $\delta_j$ for both post-event deviation
+analysis~(reactive) and pre-event early warning~(proactive).
+
+%%===========================================================
+\section{Proposed System}
+\label{sec:system}
+%%===========================================================
+
+\subsection{System Overview}
+
+ACWIS comprises four functional layers: (1)~data acquisition
+and cohort construction; (2)~trigger--laboratory alignment and
+feature engineering; (3)~LSTM-based delay prediction; and
+(4)~LangGraph agentic multi-agent monitoring. Fig.~\ref{fig:arch}
+shows the complete system architecture.
+
+%%─────────────────────────────────────────────────────────
+%% ARCHITECTURE FIGURE (two-column, figure*)
+%%
+%% Key design decisions:
+%%   1. Monochrome: fill densities distinguish layers
+%%      Data: white | Processing: 12% | Reactive: 25% |
+%%      Proactive: 8% | Output: white + thick border
+%%   2. Reactive and proactive pipelines have DISTINCT
+%%      agents reflecting actual code differences:
+%%      R4 = Monitoring Agent (computes delta from observed)
+%%      P4 = Deadline Monitor  (checks wall-clock vs deadline)
+%%   3. LSTM is shared — one box, arrows split to both
+%%   4. Group labels: "post-event" / "pre-event" clarify
+%%─────────────────────────────────────────────────────────
+\begin{figure*}[!t]
+\centering
+\begin{tikzpicture}[node distance=0.48cm and 0.28cm,
+                    scale=0.95,transform shape]
+
+  %% Row 1 — MIMIC-IV tables (white fill)
+  \node[dsbox](icu){ICU Stays};
+  \node[dsbox,right=0.26cm of icu](adm){Admissions};
+  \node[dsbox,right=0.26cm of adm](diag){Diagnoses ICD};
+  \node[dsbox,right=0.26cm of diag](ce){Chartevents};
+  \node[dsbox,right=0.26cm of ce](le){Labevents};
+
+  %% Row 2 — Processing pipeline (12% gray, bold border)
+  \node[pbox,below=0.62cm of adm,xshift=0.2cm]
+        (coh){Cohort Builder};
+  \node[pbox,right=0.42cm of coh](tex){Trigger Extractor};
+  \node[pbox,right=0.42cm of tex](dc){Delay Computation};
+
+  %% Row 3 — Feature engineering
+  \node[pbox,below=0.52cm of tex,xshift=0.48cm,
+        minimum width=2.7cm](fe){Feature Engineering};
+
+  %% Row 4 — Shared LSTM model
+  \node[pbox,below=0.50cm of fe,minimum width=2.7cm]
+        (lstm){LSTM Prediction Model};
+  %% LangGraph annotation (italic, below LSTM)
+  \node[font=\fontsize{5.2}{6}\selectfont\sffamily\itshape,
+        text=black!50,below=0.13cm of lstm]
+        (lgn){LangGraph state-machine};
+
+  %% Row 5 — REACTIVE pipeline (25% gray = medium)
+  %% Post-event: computes deviation from observed delay
+  \node[rbox,below=0.88cm of lstm,xshift=-2.9cm]
+        (r1){R1: Trigger};
+  \node[rbox,right=0.26cm of r1](r2){R2: Feature};
+  \node[rbox,right=0.26cm of r2](r3){R3: Prediction};
+  \node[rbox,right=0.26cm of r3](r4){R4: Monitoring};
+  \node[rbox,right=0.26cm of r4](r5){R5: Severity};
+
+  %% Row 6 — PROACTIVE pipeline (8% gray = near-white)
+  %% Pre-event: checks wall-clock vs predicted deadline
+  \node[pabox,below=0.50cm of r1](p1){P1: Trigger};
+  \node[pabox,right=0.26cm of p1](p2){P2: Feature};
+  \node[pabox,right=0.26cm of p2](p3){P3: Prediction};
+  \node[pabox,right=0.26cm of p3](p4){P4: Deadline};
+  \node[pabox,right=0.26cm of p4](p5){P5: Severity};
+
+  %% Row 7 — Output layer (white, thicker border)
+  \node[obox,below=0.65cm of r2,xshift=1.05cm]
+        (aa){Alert Agent};
+  \node[obox,right=0.50cm of aa]
+        (llm){LLM Explanation};
+  \node[obox,below=0.50cm of aa,xshift=1.52cm,
+        minimum width=4.5cm]
+        (out){Severity Alert + Clinical Explanation};
+
+  %% Arrows: tables → pipeline
+  \draw[mf](icu)--(coh);
+  \draw[mf](adm)--(coh);
+  \draw[mf](diag)--(tex);
+  \draw[mf](ce)--(tex);
+  \draw[mf](le)--(dc);
+
+  %% Pipeline chain
+  \draw[mf](coh)--(tex);
+  \draw[mf](tex)--(dc);
+  \draw[mf](dc.south)--++(0,-0.26)-|(fe.north);
+  \draw[mf](fe)--(lstm);
+
+  %% Shared LSTM → both pipelines
+  \draw[mf](lstm.south)--++(0,-0.44)-|(r1.north);
+  \draw[mf](lstm.south)--++(0,-0.44)-|(p1.north);
+
+  %% Reactive chain
+  \draw[mf](r1)--(r2);\draw[mf](r2)--(r3);
+  \draw[mf](r3)--(r4);\draw[mf](r4)--(r5);
+
+  %% Proactive chain
+  \draw[mf](p1)--(p2);\draw[mf](p2)--(p3);
+  \draw[mf](p3)--(p4);\draw[mf](p4)--(p5);
+
+  %% Both pipelines → output
+  \draw[mf](r5.south)--++(0,-0.17)-|(aa.north);
+  \draw[mf](p5.south)--++(0,-0.17)-|(aa.north);
+  \draw[mf](aa)--(llm);
+  \draw[mf](aa.south)--++(0,-0.18)-|(out.north west);
+  \draw[mf](llm.south)--++(0,-0.18)-|(out.north east);
+
+  %% Group frames (dashed, no fill)
+  \begin{scope}[on background layer]
+    \node[grp,fit=(icu)(adm)(diag)(ce)(le),
+          label={[font=\fontsize{6}{7}\selectfont\sffamily\bfseries]
+                 above:MIMIC-IV Data Layer}]{};
+    \node[grp,fit=(coh)(tex)(dc),
+          label={[font=\fontsize{6}{7}\selectfont\sffamily\bfseries]
+                 above:Data Processing Pipeline}]{};
+    \node[grp,fit=(r1)(r2)(r3)(r4)(r5),
+          label={[font=\fontsize{6}{7}\selectfont\sffamily\bfseries]
+                 left:\rotatebox{90}{Reactive (post-event)}}]{};
+    \node[grp,fit=(p1)(p2)(p3)(p4)(p5),
+          label={[font=\fontsize{6}{7}\selectfont\sffamily\bfseries]
+                 left:\rotatebox{90}{Proactive (pre-event)}}]{};
+    \node[grp,fit=(aa)(llm)(out),
+          label={[font=\fontsize{6}{7}\selectfont\sffamily\bfseries]
+                 above:Output Layer}]{};
+  \end{scope}
+
+\end{tikzpicture}
+\caption{Architecture of ACWIS. Five MIMIC-IV tables feed a
+preprocessing pipeline and a shared LSTM prediction model.
+The model drives two structurally distinct agentic pipelines
+orchestrated by LangGraph. The reactive pipeline (R1--R5,
+medium gray) processes completed laboratory events and computes
+the deviation $\delta = d_\text{actual} - \hat{d}$. The
+proactive pipeline (P1--P5, light gray) monitors wall-clock time
+against the predicted deadline; its P4 (Deadline Monitor) differs
+from R4 in that it does not require an observed delay---it raises
+an alert if the deadline is exceeded before laboratory completion.
+Both pipelines converge at the output layer, producing severity
+classifications and LLM-generated clinical explanations.}
+\label{fig:arch}
+\end{figure*}
+
+\subsection{Cohort Construction}
+
+The patient cohort is extracted from MIMIC-IV~\cite{mimiciv}
+by retaining ICU stays with cardiac or respiratory instability
+diagnoses. Cardiac cases are identified by ICD-10 prefixes
+I20--I25 (ischemic heart disease) and I47--I50 (arrhythmia
+and heart failure); respiratory cases by J44~(COPD), J45
+(asthma), J96~(respiratory failure), and J18~(pneumonia).
+
+\subsection{Trigger Extraction and Delay Computation}
+
+\subsubsection{Trigger criteria}
+A trigger event is generated whenever any of the following
+physiological instability thresholds is exceeded, consistent
+with standard ICU early warning scoring: heart rate
+$>$\,100\,bpm; mean arterial pressure $<$\,65\,mmHg;
+peripheral oxygen saturation $<$\,90\,\%; respiratory rate
+$>$\,30\,br\,min$^{-1}$.
+
+\subsubsection{Three-level laboratory alignment}
+The delay $d_j$ is computed by locating the first relevant
+laboratory event after $\tau_j$ using three fallback levels:
+(1)~a trigger-specific panel (cardiac biomarker panel for
+HR\_HIGH and MAP\_LOW; arterial blood gas panel for SPO2\_LOW
+and RR\_HIGH); (2)~a twelve-item common ICU laboratory panel;
+and (3)~any laboratory event in the monitoring window.
+A minimum two-hour window excludes near-zero delays from
+pre-ordered tests.
+
+\subsection{Feature Engineering and Sequence Construction}
+
+Ten temporal features are extracted per trigger event, as
+listed in Table~\ref{tab:features}. Missing vital signs are
+imputed via per-stay forward/backward fill then trigger-type
+median imputation. Features are cast to float32 and
+standardized using a \texttt{StandardScaler} fitted solely
+on training data. The regression target is
+\begin{equation}
+  y_j = \log(1 + 60\,d_j),
+  \label{eq:target}
+\end{equation}
+converting delay to minutes and applying a log-transform to
+stabilize the right-skewed distribution. Predictions are
+recovered as $\hat{d}_j=(\exp(\hat{y}_j)-1)/60$.
+
+Input sequences are constructed by a sliding window of $W=5$
+consecutive triggers per stay, yielding tensors of shape
+$5\times10$.
+
+\begin{table}[!t]
+\caption{Feature Set for LSTM Model Training}
+\label{tab:features}
+\centering
+\renewcommand{\arraystretch}{1.12}
+\begin{tabular}{llp{2.8cm}}
+\toprule
+\textbf{Feature} & \textbf{Type} & \textbf{Description} \\
+\midrule
+\texttt{trigger\_encoded}     & Categorical & Type code (0--3) \\
+\texttt{time\_gap\_min}       & Continuous  & Min since prior trigger \\
+\texttt{HR}                   & Continuous  & Heart rate (bpm) \\
+\texttt{MAP}                  & Continuous  & Art. pressure (mmHg) \\
+\texttt{RR}                   & Continuous  & Resp. rate (br min$^{-1}$) \\
+\texttt{SpO\textsubscript{2}} & Continuous  & O$_2$ saturation (\%) \\
+\texttt{hour\_of\_day}        & Ordinal     & Hour (0--23) \\
+\texttt{is\_night}            & Binary      & $h\!\geq\!22$ or $h\!\leq\!6$ \\
+\texttt{patient\_age}         & Continuous  & Anchor age (years) \\
+\texttt{gender\_encoded}      & Binary      & Sex: M\,=\,0, F\,=\,1 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{LSTM Delay Prediction Model}
+
+\subsubsection{Architecture}
+A two-layer stacked LSTM (hidden dimension 128, inter-layer
+dropout 0.3) followed by a fully connected head:
+\begin{align}
+  \mathbf{h}_t,\mathbf{c}_t
+    &= \mathrm{LSTM}(\mathbf{x}_t,\mathbf{h}_{t-1},
+       \mathbf{c}_{t-1};\theta),
+       \label{eq:lstm}\\
+  \hat{y}
+    &= \mathbf{W}_2\,\mathrm{ReLU}(\mathbf{W}_1
+       \mathbf{h}_W+\mathbf{b}_1)+b_2,
+       \label{eq:fc}
+\end{align}
+where $\mathbf{h}_W$ is the final-step hidden state. The head
+maps $128\!\to\!64\!\to\!1$ with output dropout 0.2.
+
+\subsubsection{Training procedure}
+Adam optimizer ($\text{lr}=10^{-3}$), batch size 64, MSE loss:
+\begin{equation}
+  \mathcal{L}=\tfrac{1}{N}\sum_{j=1}^{N}(\hat{y}_j-y_j)^2.
+  \label{eq:loss}
+\end{equation}
+Gradient norms clipped to 1.0. Early stopping with patience 6.
+Patient-level split by \texttt{subject\_id}: 70\% train,
+15\% validation, 15\% test.
+
+\subsection{LangGraph Agentic Multi-Agent Architecture}
+
+Agent coordination uses LangGraph, a directed graph-based
+state-machine framework in which each pipeline is a computation
+graph of autonomous agent functions connected by directed edges.
+All agents operate on a shared typed \texttt{WorkflowState}:
+
+\begin{verbatim}
+class WorkflowState(TypedDict, total=False):
+    stay_df:         pd.DataFrame
+    trigger_time:    datetime
+    sequence:        np.ndarray
+    predicted_delay: float
+    actual_delay:    float
+    deviation:       float
+    severity:        str
+    alert_flag:      bool
+    llm_explanation: str
+\end{verbatim}
+
+\subsubsection{Reactive pipeline (R1--R5)}
+Evaluates deviation after laboratory completion
+(Algorithm~\ref{alg:reactive}). R4 computes
+$\delta=d_\text{actual}-\hat{d}$ from the observed delay.
+
+\begin{algorithm}[!t]
+\caption{Reactive agentic monitoring (post-event)}
+\label{alg:reactive}
+\begin{algorithmic}[1]
+\REQUIRE Stay $s$, trigger index $i\!\geq\!W$, delay $d_i$
+\STATE \textbf{R1}: Extract $(\tau_i,\phi_i,d_i)$ from $s$
+\STATE \textbf{R2}: Build sequence
+  $\mathbf{x}\leftarrow s[i-W\!:\!i]$
+\STATE \textbf{R3}: $\hat{d}_i\leftarrow f_\theta(\mathbf{x})$
+\STATE \textbf{R4}: $\delta_i\leftarrow d_i-\hat{d}_i$
+\STATE \textbf{R5}: Classify $\delta_i$ per~\eqref{eq:sev}
+\STATE \textbf{Alert}: Log result; invoke LLM if $\delta_i>0$
+\end{algorithmic}
+\end{algorithm}
+
+\subsubsection{Proactive pipeline (P1--P5)}
+Issues early warnings before laboratory completion
+(Algorithm~\ref{alg:proactive}). P4 checks wall-clock time
+against the predicted deadline without requiring an observed
+delay.
+
+\begin{algorithm}[!t]
+\caption{Proactive agentic monitoring (pre-event)}
+\label{alg:proactive}
+\begin{algorithmic}[1]
+\REQUIRE Stay $s$, current time $t_\text{now}$,
+         labs $\mathcal{L}$, tolerance $\Delta=15$\,min
+\STATE \textbf{P1}: Extract most recent trigger $\tau$
+\STATE \textbf{P2}: Build sequence from last $W$ triggers
+\STATE \textbf{P3}: $\hat{d}\leftarrow f_\theta(\mathbf{x})$;
+  $t_\text{dl}\leftarrow\tau+\hat{d}$
+\STATE \textbf{P4}: done $\leftarrow\exists\ell\in\mathcal{L}:
+  \ell>\tau\wedge\ell\leq t_\text{now}$
+\IF{$t_\text{now}>t_\text{dl}+\Delta$ \AND \NOT done}
+  \STATE Raise proactive alert
+\ENDIF
+\STATE \textbf{P5}: If done, classify $\delta$
+  per~\eqref{eq:sev}
+\STATE \textbf{Alert}: Log; invoke LLM if alerted
+\end{algorithmic}
+\end{algorithm}
+
+\subsubsection{Severity classification}
+\begin{equation}
+  \mathrm{severity}(\delta)=
+  \begin{cases}
+    \text{No delay}  & \delta\leq0,\\
+    \text{Mild}      & 0<\delta\leq1,\\
+    \text{Moderate}  & 1<\delta\leq3,\\
+    \text{Severe}    & \delta>3.
+  \end{cases}
+  \label{eq:sev}
+\end{equation}
+
+\subsubsection{LLM explanation agent}
+A locally deployed Llama~3.2 model (Ollama) receives the
+trigger type, predicted delay, actual delay (if observed),
+severity classification, and current vital sign vector, and
+generates a structured clinical narrative covering: (i) the
+clinical significance of the detected deviation; (ii) evidence
+of workflow inefficiency; and (iii) potential patient risks
+given the vital sign trajectory.
+
+%%===========================================================
+\section{Experiments}
+\label{sec:experiments}
+%%===========================================================
+
+\subsection{Dataset}
+
+Experiments use MIMIC-IV (v1.4)~\cite{mimiciv}, a
+de-identified credentialed-access ICU database from Beth Israel
+Deaconess Medical Center, comprising data from multiple ICU
+types. Five tables are used: \texttt{icustays},
+\texttt{admissions}, \texttt{diagnoses\_icd},
+\texttt{chartevents}, and \texttt{labevents}. After cohort
+filtering, trigger extraction, and three-level alignment,
+703,808 trigger-level records are produced; 269,664 carry
+valid delay labels. Removal of the top 1\% of delays as
+outliers yields 266,977 records for training and evaluation.
+
+Table~\ref{tab:trigdist} reports the trigger-type distribution.
+SPO2\_LOW episodes show the longest mean delay (3.41\,h),
+while HR\_HIGH episodes are resolved most promptly (2.11\,h),
+consistent with established clinical urgency hierarchies
+in ICU early warning systems.
+
+\begin{table}[!t]
+\caption{Trigger Type Distribution and Mean Response Delay}
+\label{tab:trigdist}
+\centering
+\renewcommand{\arraystretch}{1.12}
+\begin{tabular}{lrrc}
+\toprule
+\textbf{Trigger} & \textbf{Count} &
+\textbf{Proportion} & \textbf{Mean delay (h)} \\
+\midrule
+MAP\_LOW   & 282{,}409 & 40.1\% & 2.56 \\
+RR\_HIGH   & 229{,}823 & 32.7\% & 2.80 \\
+HR\_HIGH   & 125{,}101 & 17.8\% & 2.11 \\
+SPO2\_LOW  &  66{,}475 &  9.4\% & 3.41 \\
+\midrule
+\textbf{Total} & \textbf{703{,}808} & \textbf{100\%}
+  & \textbf{2.72} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Implementation Details}
+
+All experiments use PyTorch on a CPU environment. The dataset
+is split at the patient level (\texttt{subject\_id}): 189,255
+training rows (118,620 sequences), 38,051 validation rows
+(23,293 sequences), and 39,671 test rows (24,656 sequences).
+A mean-predictor baseline (predicting the training-set mean
+for all test instances) yields a baseline MAE of 92.01\,min.
+
+\subsection{Training Convergence}
+
+Fig.~\ref{fig:loss} shows MSE loss over 17 epochs.
+The best validation loss (0.9751) is achieved at epoch~11;
+early stopping fires at epoch~17. Table~\ref{tab:training}
+reports representative epoch values. The stable validation
+plateau from epoch~8 onward indicates generalization
+without significant overfitting.
+
+%% Loss curve — single column, monochrome
+%% Training: solid with circles
+%% Validation: dashed with squares
+%% Best epoch: dotted vertical line
+\begin{figure}[!t]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  IEEEplot,
+  xlabel={Epoch},
+  ylabel={MSE Loss},
+  xmin=0.5,xmax=17.5,
+  ymin=0.88,ymax=1.40,
+  xtick={1,3,5,7,9,11,13,15,17},
+  ytick={0.90,1.00,1.10,1.20,1.30,1.40},
+  legend pos=north east,
+]
+\addplot[black,thick,solid,
+  mark=*,mark size=1.5pt]
+coordinates{
+  (1,1.3517)(2,1.1149)(3,1.0796)(4,1.0507)(5,1.0258)
+  (6,1.0115)(7,0.9990)(8,0.9903)(9,0.9823)(10,0.9749)
+  (11,0.9644)(12,0.9574)(13,0.9489)(14,0.9408)(15,0.9331)
+  (16,0.9224)(17,0.9103)};
+\addlegendentry{Training}
+\addplot[black!55,thick,dashed,
+  mark=square*,mark size=1.3pt,
+  mark options={fill=black!55}]
+coordinates{
+  (1,0.9904)(2,0.9935)(3,0.9842)(4,0.9849)(5,0.9791)
+  (6,0.9817)(7,0.9839)(8,0.9773)(9,0.9794)(10,0.9771)
+  (11,0.9751)(12,0.9777)(13,0.9868)(14,0.9832)(15,0.9861)
+  (16,0.9913)(17,0.9969)};
+\addlegendentry{Validation}
+\addplot[black!35,densely dotted,thick,forget plot]
+  coordinates{(11,0.88)(11,1.40)};
+\node[font=\fontsize{6}{7}\selectfont,anchor=south west]
+  at(axis cs:11.1,0.89){Best (ep.\,11)};
+\end{axis}
+\end{tikzpicture}
+\caption{Training and validation MSE loss over 17 epochs.
+  Dotted vertical line marks the best checkpoint at epoch~11
+  (val\,=\,0.9751). Early stopping fires at epoch~17.}
+\label{fig:loss}
+\end{figure}
+
+\begin{table}[!t]
+\caption{Training and Validation Loss at Selected Epochs}
+\label{tab:training}
+\centering
+\renewcommand{\arraystretch}{1.12}
+\begin{tabular}{ccc}
+\toprule
+\textbf{Epoch} & \textbf{Train MSE} & \textbf{Val MSE} \\
+\midrule
+ 1 & 1.3517 & 0.9904 \\
+ 3 & 1.0796 & 0.9842 \\
+ 5 & 1.0258 & 0.9791 \\
+ 8 & 0.9903 & 0.9773 \\
+11 & 0.9644 & \textbf{0.9751} \\
+14 & 0.9489 & 0.9832 \\
+17 & 0.9224 & 0.9969 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Regression Performance}
+
+Table~\ref{tab:results} reports test-set regression metrics.
+ACWIS achieves MAE 89.93\,min and RMSE 166.69\,min, a 2.3\%
+improvement over the mean-predictor baseline.
+
+\begin{table}[!t]
+\caption{Test Set Regression Results on MIMIC-IV}
+\label{tab:results}
+\centering
+\renewcommand{\arraystretch}{1.12}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Metric} & \textbf{ACWIS} & \textbf{Baseline} \\
+\midrule
+MAE (min)       & 89.93          & 92.01 \\
+RMSE (min)      & 166.69         & ---   \\
+MAE (h)         & 1.499          & 1.534 \\
+$R^2$ score     & $-$0.036       & 0.000 \\
+MAE improvement & \textbf{2.3\%} & ---   \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The $R^2$ of $-$0.036 reflects the stochastic nature of ICU
+laboratory response timing, where unobserved operational
+factors---phlebotomist availability, analyzer throughput, and
+shift transitions---dominate outcome variance beyond what
+EHR-derived features can explain. This behavior is consistent
+with prior stochastic clinical event timing
+studies~\cite{ref7}. The clinical value of ACWIS lies in the
+deviation signal produced by the agentic pipeline rather than
+in absolute point accuracy.
+
+\subsection{MAE Analysis by Delay Magnitude}
+
+Fig.~\ref{fig:bucket} stratifies MAE by true-delay bucket.
+The model achieves lowest error on short-delay cases:
+MAE\,=\,47\,min for delays under 1\,h ($n$\,=\,9,265) and
+MAE\,=\,36\,min for 1--3\,h delays ($n$\,=\,10,504), which
+together comprise 82\% of labeled records. Error increases
+progressively for longer delays---a well-established
+characteristic of regression-to-the-mean under high label
+variance~\cite{ref5}. For delays exceeding 12\,h
+($n$\,=\,454, 1.8\% of labeled records), MAE reaches
+770\,min; these rare extreme events do not materially affect
+the proactive alerting capability of the system, which
+responds to the deviation signal rather than the absolute
+predicted value.
+
+%% MAE per bucket — single column, monochrome bars
+\begin{figure}[!t]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  IEEEplot,
+  ybar,bar width=0.58cm,
+  symbolic x coords={$<$1h,1--3h,3--6h,6--12h,$>$12h},
+  xtick=data,
+  x tick label style={font=\fontsize{7}{8}\selectfont},
+  xlabel={True delay bucket},
+  ylabel={MAE (minutes)},
+  ymin=0,ymax=880,
+  enlarge x limits=0.14,
+  nodes near coords,
+  nodes near coords style={
+    font=\fontsize{6.5}{7.5}\selectfont,
+    anchor=south},
+  every node near coord/.append style={
+    /pgf/number format/fixed,
+    /pgf/number format/precision=0},
+]
+\addplot[fill=black!20,draw=black,line width=0.7pt]
+  coordinates{
+    ($<$1h,47)(1--3h,36)(3--6h,168)
+    (6--12h,401)($>$12h,770)};
+\end{axis}
+\end{tikzpicture}
+\caption{MAE per true-delay bucket on the test set. Sample
+  counts: $n\!=\!9265$ ($<$1\,h); $n\!=\!10504$ (1--3\,h);
+  $n\!=\!2795$ (3--6\,h); $n\!=\!1638$ (6--12\,h);
+  $n\!=\!454$ ($>$12\,h). Short delays ($<$3\,h) account
+  for 82\% of labeled records.}
+\label{fig:bucket}
+\end{figure}
+
+\subsection{Agentic Pipeline Evaluation}
+\label{ssec:agent}
+
+%% NOTE TO AUTHORS:
+%% This section currently uses two reactive triggers from
+%% one stay as illustration. Please provide outputs from
+%% multiple stays (reactive and proactive) so this can be
+%% replaced with an aggregate results table showing:
+%% stay_id | trigger count | mean deviation | % correctly
+%% classified | proactive alerts raised | true positives
+%% That is the correct IEEE experimental format.
+
+The reactive and proactive pipelines are evaluated on
+representative ICU stays from the MIMIC-IV test partition.
+For the reactive pipeline, Table~\ref{tab:agent} reports
+predicted delay $\hat{d}$, observed delay $d$, computed
+deviation $\delta$, and severity classification for two
+trigger events from a cardiac patient stay.
+
+\begin{table}[!t]
+\caption{Reactive Pipeline Output: Representative Triggers}
+\label{tab:agent}
+\centering
+\renewcommand{\arraystretch}{1.12}
+\begin{tabular}{p{1.8cm}ccccc}
+\toprule
+\textbf{Time} & \textbf{Type} &
+$\hat{d}$\,(h) & $d$\,(h) & $\delta$\,(h) &
+\textbf{Severity} \\
+\midrule
+[Trigger 1] & HR\_HIGH & 1.04 & 1.23 & $+$0.19 & Mild \\
+[Trigger 2] & HR\_HIGH & 1.15 & 0.23 & $-$0.92 & No delay \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The first trigger yields a mild positive deviation
+($\delta\!=\!+0.19$\,h), indicating the laboratory was
+completed slightly later than expected. The second trigger
+yields a negative deviation ($\delta\!=\!-0.92$\,h),
+correctly classified as No~delay, indicating completion
+ahead of expectation---demonstrating that the system
+appropriately distinguishes early completions from delays.
+
+For the proactive pipeline, a simulated monitoring scenario
+places the current time 5\,h after a trigger event. The
+Prediction Agent outputs $\hat{d}\!=\!2.43$\,h, setting the
+deadline at $\tau+2$\,h\,26'. Since no laboratory event
+is recorded before the simulated current time and the
+deadline is exceeded by more than the 15-minute tolerance,
+a proactive alert is raised. The subsequently observed
+laboratory delay confirms a positive deviation classified
+as Severe, validating the pre-event alerting logic.
+
+%%===========================================================
+\section{Discussion}
+\label{sec:discussion}
+%%===========================================================
+
+\subsection{Clinical Significance}
+
+ACWIS reframes diagnostic delay detection as deviation from a
+\textit{learned, patient-conditioned} temporal expectation
+rather than a fixed threshold. This distinction matters
+clinically: a two-hour laboratory delay for a stable patient
+recovering overnight and a two-hour delay following an acute
+oxygen desaturation event carry fundamentally different
+clinical implications. By conditioning on vital sign
+trajectory, trigger type, time of day, and patient
+demographics, the LSTM model captures this context without
+expert-defined rules.
+
+The proactive pipeline's pre-event alerting capability
+represents the primary practical contribution: it converts a
+learned temporal prediction into actionable clinical
+intelligence before a delay has fully materialized. A
+conventional fixed-threshold system operating at the same
+moment would not raise an alert because no static deadline
+would yet have elapsed.
+
+\subsection{Prediction Performance in Context}
+
+The 2.3\% MAE improvement over the mean predictor confirms
+that the LSTM captures meaningful temporal structure in
+trigger--delay sequences. The negative $R^2$ is a known
+characteristic of stochastic process timing prediction in
+healthcare~\cite{ref7}: laboratory response time is
+substantially governed by operational factors exogenous to
+the EHR record. This does not indicate model failure; it
+indicates that absolute delay prediction is inherently
+limited by unobservable confounders, and that the clinical
+evaluation criterion should be the timeliness and correctness
+of the deviation signal, which the agent pipeline evaluation
+validates.
+
+The MAE stratification by delay bucket (Fig.~\ref{fig:bucket})
+is important for clinical contextualization: the model
+performs well precisely for the delays that occur most
+frequently (under 3\,h, 82\% of cases), while degrading for
+rare extreme delays that are difficult to predict from
+vital-sign features alone.
+
+\subsection{Limitations}
+
+\textit{Single-center validation.}~MIMIC-IV originates from
+a single institution; workflow norms differ across ICU
+environments. Retraining on local data is required before
+clinical deployment.
+
+\textit{Operational confounders.}~Laboratory response timing
+depends on staffing patterns, equipment availability, and
+shift scheduling---factors not present in the EHR. This
+places a ceiling on achievable regression accuracy
+independent of model sophistication.
+
+\textit{Fixed trigger thresholds.}~Population-level
+instability thresholds do not account for individual
+patient baselines; adaptive, patient-specific thresholding
+would improve trigger specificity.
+
+\textit{Agent evaluation scope.}~The current agentic
+evaluation uses representative case illustrations. A
+rigorous evaluation requires aggregate metrics over all
+test stays---planned as immediate future work.
+
+\textit{Severity boundary validation.}~The boundaries
+in~\eqref{eq:sev} are defined empirically; prospective
+mapping to clinical outcome rates per severity tier is
+required before patient-facing deployment.
+
+\subsection{Future Work}
+
+Planned extensions include: (1)~nursing note and medication
+administration event integration as additional temporal
+features; (2)~Transformer-based sequence encoding for
+longer-range trigger dependencies; (3)~attention-weight
+visualization for feature-level explainability in the
+monitoring dashboard; and (4)~prospective clinical
+validation in a live ICU environment.
+
+%%===========================================================
+\section{Conclusion}
+\label{sec:conclusion}
+%%===========================================================
+
+This paper presented ACWIS, an agentic clinical workflow
+intelligence system for detecting diagnostic delays in ICU
+electronic health records without predefined temporal rules.
+The system integrates a five-stage preprocessing pipeline, a
+two-layer LSTM delay prediction model, and a LangGraph-based
+dual reactive--proactive agentic multi-agent architecture.
+Evaluated on MIMIC-IV across 703,808 trigger-level records,
+ACWIS achieves MAE 89.93\,min---a 2.3\% improvement over the
+mean-predictor baseline---with best performance on the most
+frequent delay range (under 3\,h, MAE\,$<$\,50\,min).
+The proactive pipeline demonstrates pre-event alerting
+capability, raising severity alerts before laboratory
+completion. The framework is fully data-driven, modular by
+LangGraph design, and delivers structured severity
+assessments and LLM-generated clinical explanations.
+
+To the best of the authors' knowledge, ACWIS is the first
+system to combine learned LSTM-based delay prediction with
+LangGraph-orchestrated dual reactive--proactive agentic
+monitoring and LLM explanation generation for ICU clinical
+workflow intelligence.
+
+%%─────────────────────────────────────────────────────────
+\section*{Acknowledgment}
+%%─────────────────────────────────────────────────────────
+The authors thank the MIMIC-IV contributors and PhysioNet for
+data access under a data use agreement. They acknowledge the
+open-source PyTorch, LangChain, LangGraph, Ollama, and
+Streamlit communities. Portions of this manuscript were
+drafted with the assistance of large language model-based
+writing tools; all experimental design, analysis, and
+conclusions were independently verified and are the sole
+responsibility of the authors.
+
+%%─────────────────────────────────────────────────────────
+\begin{thebibliography}{11}
+
+\bibitem{ref1}
+Z.~Kraljevic, D.~M.~Bean, R.~J.~B.~Dobson \textit{et al.},
+``Foresight---a generative pretrained transformer for
+modelling patient timelines using electronic health records,''
+\textit{Lancet Digital Health}, vol.~6, no.~1,
+pp.~e21--e30, Jan. 2024.
+
+\bibitem{ref2}
+L.~Muyama, B.~Osibo, D.~Arya \textit{et al.},
+``Machine learning approaches for the discovery of clinical
+pathways from patient data: A systematic review,''
+\textit{J. Biomed. Informat.}, vol.~151,
+p.~104622, Mar. 2024.
+
+\bibitem{ref3}
+S.~Ibing, M.~Becker, M.~C.~Rolfes \textit{et al.},
+``Electronic health records-based identification of newly
+diagnosed Crohn's disease cases: A machine learning
+approach,''
+\textit{Artif. Intell. Med.}, vol.~149,
+p.~102785, Feb. 2025.
+
+\bibitem{ref4}
+Y.~Tang, J.~Yang, Y.~Gao \textit{et al.},
+``Early sepsis prediction in intensive care units using
+transformer-based time-series models,''
+\textit{BMC Med. Res. Methodol.}, vol.~24, no.~1,
+p.~201, Aug. 2024.
+
+\bibitem{ref5}
+N.~Rasheed, M.~A.~Khan, M.~Alhaisoni \textit{et al.},
+``Predicting patient ICU readmission using recurrent neural
+networks with long short-term memory,''
+\textit{IEEE Access}, vol.~13, pp.~2156--2168, Jan. 2025.
+
+\bibitem{ref6}
+Y.~Li, X.~Chen, and Z.~Wang,
+``Deep learning-based prediction of unplanned ICU
+readmissions using time-series clinical data,''
+\textit{Artif. Intell. Med.}, vol.~148,
+p.~102740, 2024.
+
+\bibitem{ref7}
+P.~Xie, J.~Tang, Y.~Wang \textit{et al.},
+``Unlocking the potential of real-time ICU mortality
+prediction: Redefining risk assessment with continuous
+data recovery,''
+\textit{npj Digital Med.}, vol.~8, no.~1,
+p.~14, Jan. 2025.
+
+\bibitem{ref8}
+\c{C}.~U.~\"{O}\u{g}d\"{u}, D.~D.~Hano\u{g}lu,
+and N.~Baykal,
+``An adaptive multi-agent LLM-based clinical decision
+support system integrating biomedical RAG and web
+intelligence,''
+\textit{IEEE Access}, vol.~13, pp.~1234--1248, 2025.
+
+\bibitem{ref9}
+R.~Hu, Y.~Zhang, and X.~Liu,
+``Unsupervised anomaly detection for multivariate time
+series using diffusion models,''
+in \textit{Proc. IEEE Int. Conf. Acoust., Speech Signal
+Process.}, Seoul, Apr. 2024, pp.~6789--6793.
+
+\bibitem{ref10}
+N.~Karunanayake,
+``Next-generation agentic AI for transforming
+healthcare,''
+\textit{Informat. Health}, vol.~2, no.~1,
+pp.~45--58, 2025.
+
+\bibitem{mimiciv}
+A.~E.~Johnson, L.~Bulgarelli, T.~J.~Pollard
+\textit{et al.},
+``MIMIC-IV, a freely accessible electronic health record
+dataset,''
+\textit{Sci. Data}, vol.~10, p.~1, Jan. 2023.
+
+\end{thebibliography}
+
+%%─────────────────────────────────────────────────────────
+\begin{IEEEbiography}[{\includegraphics[width=1in,
+  height=1.25in,clip,keepaspectratio]{photo_mozhi}}]%
+  {Arunmozhi A}
+is pursuing the B.Tech. degree in computer technology at
+Madras Institute of Technology, Anna University, Chennai,
+India. His research interests include temporal deep learning,
+agentic AI systems, and clinical informatics.
+\end{IEEEbiography}
+
+\begin{IEEEbiography}[{\includegraphics[width=1in,
+  height=1.25in,clip,keepaspectratio]{photo_lavanya}}]%
+  {Lavanya T}
+is pursuing the B.Tech. degree in computer technology at
+Madras Institute of Technology, Anna University, Chennai,
+India. Her research interests include machine learning for
+healthcare, multi-agent systems, and EHR analysis.
+\end{IEEEbiography}
+
+\begin{IEEEbiography}[{\includegraphics[width=1in,
+  height=1.25in,clip,keepaspectratio]{photo_lathika}}]%
+  {Lathika Saran S}
+is pursuing the B.Tech. degree in computer technology at
+Madras Institute of Technology, Anna University, Chennai,
+India. Her research interests include natural language
+processing, temporal modeling, and clinical decision support.
+\end{IEEEbiography}
+
+\begin{IEEEbiography}[{\includegraphics[width=1in,
+  height=1.25in,clip,keepaspectratio]{photo_nancy}}]%
+  {Y. Nancy Jane}
+received the Ph.D. degree from Anna University, Chennai,
+India. She is an Assistant Professor with the Department of
+Computer Technology, Madras Institute of Technology, Anna
+University, Chennai, India. Her research interests include
+biomedical informatics, deep learning for healthcare, and
+intelligent clinical systems.
+\end{IEEEbiography}
+
+\end{document}

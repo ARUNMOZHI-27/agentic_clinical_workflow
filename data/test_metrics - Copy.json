@@ -1,0 +1,8 @@
+{
+  "mae_min": 89.93,
+  "rmse_min": 166.69,
+  "mae_hr": 1.499,
+  "r2": -0.0357,
+  "baseline_mae": 92.01,
+  "improvement": 2.3
+}

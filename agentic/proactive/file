@@ -1,0 +1,743 @@
+D:\agentic_clinical_workflow> python -m agentic.run_reactive           
+Loading dataset...
+Columns: ['subject_id', 'hadm_id', 'stay_id', 'trigger_time', 'trigger_type', 'trigger_encoded', 'delay_hours', 'HR', 'MAP', 'RR', 'SPO2', 'time_gap_min', 'hour_of_day', 'is_night', 'patient_age', 'gender_encoded']
+All 10 features present ✅
+Simulating Stay: 30000831
+Total triggers with valid delay: 5
+Not enough delay rows — using full stay for sequence.
+Using full stay: 28 triggers
+[Trigger Agent]
+Trigger Time: 2140-04-20 03:00:00
+Trigger Type: HR_HIGH
+[Feature Agent]
+[Prediction Agent]
+Predicted Delay: 1.19 hr
+[Reactive Monitoring Agent]
+Trigger Time:           2140-04-20 03:00:00
+Predicted Delay (hrs):  1.19
+Actual Delay (hrs):     1.23
+Deviation (hrs):        0.04
+[Severity Agent]
+Predicted Delay (hrs): 1.19
+Actual Delay (hrs):    1.23
+Deviation (hrs):       0.04
+Severity Level: Mild
+--------------------------------------------------
+[Explanation Agent - LLM]
+No prediction available.
+[Alert Agent]
+Actual Delay: 1.23
+Deviation: 0.04
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "D:\agentic_clinical_workflow\agentic\run_reactive.py", line 171, in <module>
+    graph.invoke(initial_state)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "C:\Users\DELL\AppData\Local\Programs\Python\Python313\Lib\site-packages\langgraph\pregel\main.py", line 3071, in invoke
+    for chunk in self.stream(
+                 ~~~~~~~~~~~^
+        input,
+        ^^^^^^
+    ...<10 lines>...
+        **kwargs,
+        ^^^^^^^^^
+    ):
+    ^
+  File "C:\Users\DELL\AppData\Local\Programs\Python\Python313\Lib\site-packages\langgraph\pregel\main.py", line 2646, in stream
+    for _ in runner.tick(
+             ~~~~~~~~~~~^
+        [t for t in loop.tasks.values() if not t.writes],
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<2 lines>...
+        schedule_task=loop.accept_push,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ):
+    ^
+  File "C:\Users\DELL\AppData\Local\Programs\Python\Python313\Lib\site-packages\langgraph\pregel\_runner.py", line 167, in tick
+    run_with_retry(
+    ~~~~~~~~~~~~~~^
+        t,
+        ^^
+    ...<10 lines>...
+        },
+        ^^
+    )
+    ^
+  File "C:\Users\DELL\AppData\Local\Programs\Python\Python313\Lib\site-packages\langgraph\pregel\_retry.py", line 42, in run_with_retry
+    return task.proc.invoke(task.input, config)
+           ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\DELL\AppData\Local\Programs\Python\Python313\Lib\site-packages\langgraph\_internal\_runnable.py", line 656, in invoke
+    input = context.run(step.invoke, input, config, **kwargs)
+  File "C:\Users\DELL\AppData\Local\Programs\Python\Python313\Lib\site-packages\langgraph\_internal\_runnable.py", line 400, in invoke
+    ret = self.func(*args, **kwargs)
+  File "D:\agentic_clinical_workflow\agentic\agents\alert_agent.py", line 8, in alert_agent
+    state["proactive_flag"])
+    ~~~~~^^^^^^^^^^^^^^^^^^
+
+```python
+from typing import TypedDict, Optional
+from datetime import datetime
+import pandas as pd
+import numpy as np
+
+class WorkflowState(TypedDict):
+    stay_id: int
+    stay_df: pd.DataFrame
+    index: int
+
+    trigger_time: datetime
+    episode_type: int
+    time_gap_min: float
+    sequence:np.ndarray
+    predicted_delay: float
+    deadline: datetime
+
+    actual_delay: float
+    deviation: float
+
+    proactive_flag: bool
+    reactive_flag: booldef alert_agent(state):
+    print("[Alert Agent]")
+
+    print("Actual Delay:", round(state["actual_delay"], 2))
+    print("Deviation:", round(state["deviation"], 2))
+
+    print("Proactive Alert:",
+          state["proactive_flag"])
+
+    print("Reactive Flag:",
+          state["reactive_flag"])
+
+    print("-" * 50)
+
+    return state# import numpy as np
+
+# SEQ_LEN = 5
+
+# def feature_agent(state):
+#     print("[Feature Agent]")
+
+#     stay_df = state["stay_df"]
+#     i = state["index"]
+
+#     seq_df = stay_df.iloc[i-SEQ_LEN:i]
+
+#     features = [
+#         "episode_type",
+#         "time_gap_min",
+#         "HR",
+#         "MAP",
+#         "RR",
+#         "SPO2"
+#     ]
+
+#     state["sequence"] = seq_df[features].values
+
+#     return state
+
+# ======================================================
+# File: feature_agent.py  [REACTIVE]
+# Changes: episode_type → trigger_encoded
+#          + 5 new features (hour, night, weekend, age, gender)
+#          features_len: 6 → 11
+# ======================================================
+# ======================================================
+# File: feature_agent.py  [REACTIVE]
+# Changes: is_weekend REMOVED — 10 features
+# ======================================================
+
+SEQ_LEN = 5
+
+FEATURES = [
+    "trigger_encoded",
+    "time_gap_min",
+    "HR", "MAP", "RR", "SPO2",
+    "hour_of_day",
+    "is_night",
+    # is_weekend REMOVED
+    "patient_age",
+    "gender_encoded",
+]
+
+def feature_agent(state):
+    print("[Feature Agent]")
+
+    stay_df = state["stay_df"]
+    i       = state["index"]
+
+    seq_df = stay_df.iloc[i - SEQ_LEN : i]
+
+    state["sequence"] = seq_df[FEATURES].values
+    state["features"] = FEATURES
+
+    return state
+
+from langchain_ollama import ChatOllama
+
+def explanation_agent(state):
+    print("[Explanation Agent - LLM]")
+
+    predicted = state.get("predicted_delay_hours")
+    actual = state.get("actual_delay_hours")
+    severity = state.get("severity")
+    stay_df = state.get("stay_df")
+
+    if predicted is None:
+        print("No prediction available.")
+        return state
+
+    last_row = stay_df.iloc[-1]
+
+    hr = last_row.get("HR")
+    map_val = last_row.get("MAP")
+    rr = last_row.get("RR")
+    spo2 = last_row.get("SPO2")
+    episode = last_row.get("episode_type")
+
+    episode_label = "cardiac" if episode == 0 else "respiratory"
+
+    prompt = f"""
+You are a clinical workflow monitoring assistant.
+
+Episode type: {episode_label}
+Predicted expected lab delay: {predicted:.2f} hours
+Actual lab delay: {actual}
+Severity classification: {severity}
+
+Latest vitals:
+Heart Rate: {hr}
+MAP: {map_val}
+Respiratory Rate: {rr}
+SpO2: {spo2}
+
+Explain clearly:
+- What this delay means
+- Whether workflow inefficiency exists
+- Potential risks
+Be professional and concise.
+"""
+
+    llm = ChatOllama(
+        model="llama3.2",
+        temperature=0.2
+    )
+
+    response = llm.invoke(prompt)
+
+    explanation = response.content
+
+    print("\nLLM Explanation:\n")
+    print(explanation)
+    print("-" * 50)
+
+    state["llm_explanation"] = explanation
+
+    return state
+# def monitoring_agent(state):
+#     print("[Reactive Monitoring Agent]")
+
+#     trigger_time = state["trigger_time"]
+#     predicted_delay = state["predicted_delay"]
+
+#     # actual delay comes directly from dataset
+#     actual_delay = state["actual_delay"]
+
+#     deviation = abs(actual_delay - predicted_delay)
+
+#     state["deviation"] = deviation
+#     state["reactive_flag"] = True
+
+#     print("Trigger Time:", trigger_time)
+#     print("Predicted Delay (hrs):", round(predicted_delay, 2))
+#     print("Actual Delay (hrs):", round(actual_delay, 2))
+#     print("Deviation (hrs):", round(deviation, 2))
+
+# ======================================================
+# File: monitoring_agent.py  [REACTIVE]
+# Changes: No feature changes needed
+#          Works on delay values only
+# ======================================================
+# ======================================================
+# File: monitoring_agent.py  [REACTIVE]
+# No changes needed
+# ======================================================
+
+def monitoring_agent(state):
+    print("[Reactive Monitoring Agent]")
+
+    trigger_time    = state["trigger_time"]
+    predicted_delay = state["predicted_delay"]
+    actual_delay    = state["actual_delay"]
+
+    deviation = abs(actual_delay - predicted_delay)
+
+    state["deviation"]     = deviation
+    state["reactive_flag"] = True
+
+    print("Trigger Time:          ", trigger_time)
+    print("Predicted Delay (hrs): ", round(predicted_delay, 2))
+    print("Actual Delay (hrs):    ", round(actual_delay, 2))
+    print("Deviation (hrs):       ", round(deviation, 2))
+
+    return state# def severity_agent(state):
+#     print("[Severity Agent]")
+
+#     predicted = state.get("predicted_delay_hours")
+#     actual = state.get("actual_delay_hours")
+
+#     if predicted is None:
+#         print("Predicted delay missing.")
+#         state["severity"] = None
+#         return state
+
+#     if actual is None:
+#         print("Actual delay not available (lab not occurred yet).")
+#         state["severity"] = "Pending"
+#         return state
+
+#     deviation = actual - predicted
+#     state["deviation_hours"] = deviation
+
+#     print("Predicted Delay (hrs):", round(predicted, 2))
+#     print("Actual Delay (hrs):", round(actual, 2))
+#     print("Deviation (hrs):", round(deviation, 2))
+
+#     # Severity rules
+#     if deviation <= 0:
+#         severity = "No Delay"
+#     elif deviation <= 1:
+#         severity = "Mild"
+#     elif deviation <= 3:
+#         severity = "Moderate"
+#     else:
+#         severity = "Severe"
+
+#     state["severity"] = severity
+
+#     print("Severity Level:", severity)
+#     print("-" * 50)
+
+# ======================================================
+# File: severity_agent.py  [REACTIVE]
+# Changes: No changes needed
+#          Works on delay values only
+# ======================================================
+# ======================================================
+# File: severity_agent.py  [REACTIVE]
+# No changes needed
+# ======================================================
+
+def severity_agent(state):
+    print("[Severity Agent]")
+
+    predicted = state.get("predicted_delay")
+    actual    = state.get("actual_delay")
+
+    if predicted is None:
+        print("Predicted delay missing.")
+        state["severity"] = None
+        return state
+
+    if actual is None:
+        print("Actual delay not available.")
+        state["severity"] = "Pending"
+        return state
+
+    deviation           = actual - predicted
+    state["deviation"]  = deviation
+
+    print("Predicted Delay (hrs):", round(predicted, 2))
+    print("Actual Delay (hrs):   ", round(actual, 2))
+    print("Deviation (hrs):      ", round(deviation, 2))
+
+    if deviation <= 0:
+        severity = "No Delay"
+    elif deviation <= 1:
+        severity = "Mild"
+    elif deviation <= 3:
+        severity = "Moderate"
+    else:
+        severity = "Severe"
+
+    state["severity"] = severity
+
+    print("Severity Level:", severity)
+    print("-" * 50)
+
+    return state# def trigger_agent(state):
+#     row = state["stay_df"].iloc[state["index"]]
+
+#     state["trigger_time"] = row["trigger_time"]
+#     state["episode_type"] = row["episode_type"]
+#     state["actual_delay"] = row["delay_hours"]
+
+#     print("\n[Trigger Agent]")
+#     print("Trigger Time:", state["trigger_time"])
+
+#     return state
+
+# ======================================================
+# File: trigger_agent.py  [REACTIVE]
+# Changes: episode_type removed
+#          trigger_type + trigger_encoded added
+# ======================================================
+
+def trigger_agent(state):
+    print("[Trigger Agent]")
+
+    row = state["stay_df"].iloc[state["index"]]
+
+    state["trigger_time"]    = row["trigger_time"]
+    state["trigger_type"]    = row["trigger_type"]      # NEW
+    state["trigger_encoded"] = row["trigger_encoded"]   # NEW
+    state["actual_delay"]    = row["delay_hours"]
+
+    print("Trigger Time:", state["trigger_time"])
+    print("Trigger Type:", state["trigger_type"])
+
+    return state
+```
+
+KeyError: 'proactive_flag'
+During task with name 'alert' and id 'a657c104-d266-152a-c189-6303f3cf7147'
+PS D:\agentic_clinical_workflow>for reactive ewhta tro chane and also to add explanation for this also ,====================================================
+# File: run_reactive.py
+# Changes: is_weekend REMOVED
+#          10 features consistent with training
+#          eligibility check BEFORE dropna
+# ======================================================
+
+import pandas as pd
+import numpy as np
+from agentic.graph import graph
+import os
+
+SEQ_LEN      = 5
+BASE_DIR     = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, ".."))
+
+DATA_PATH = os.path.join(
+    PROJECT_ROOT, "data", "lstm_final_dataset_v3.csv"
+)
+
+# ── Load dataset ──────────────────────────────────────
+print("Loading dataset...")
+
+df = pd.read_csv(DATA_PATH, parse_dates=["trigger_time"])
+print("Columns:", list(df.columns))
+
+# ── Feature preparation ───────────────────────────────
+
+# trigger_encoded
+if "trigger_encoded" not in df.columns:
+    trigger_map = {
+        "HR_HIGH": 0, "MAP_LOW": 1,
+        "SPO2_LOW": 2, "RR_HIGH": 3
+    }
+    df["trigger_encoded"] = df["trigger_type"].map(
+        trigger_map
+    ).fillna(-1).astype(int)
+
+# Vitals group-wise fill
+vitals = ["HR", "MAP", "RR", "SPO2"]
+for col in vitals:
+    df[col] = df.groupby("trigger_type")[col].transform(
+        lambda x: x.fillna(x.median())
+    )
+    df[col] = df[col].fillna(df[col].median())
+
+df = df.sort_values(["stay_id", "trigger_time"])
+
+# Time gap
+df["time_gap_min"] = (
+    df.groupby("stay_id")["trigger_time"]
+    .diff().dt.total_seconds() / 60
+).fillna(0).clip(0, 1440)
+
+# Time features
+if "hour_of_day" not in df.columns:
+    df["hour_of_day"] = df["trigger_time"].dt.hour
+if "is_night" not in df.columns:
+    df["is_night"] = df["hour_of_day"].apply(
+        lambda h: 1 if (h >= 22 or h <= 6) else 0
+    )
+
+
+
+# Demographics
+if "patient_age" not in df.columns:
+    df["patient_age"] = 65
+else:
+    df["patient_age"] = df["patient_age"].fillna(
+        df["patient_age"].median()
+    )
+if "gender_encoded" not in df.columns:
+    df["gender_encoded"] = -1
+else:
+    df["gender_encoded"] = df["gender_encoded"].fillna(-1)
+
+# ── Verify features ───────────────────────────────────
+FEATURES = [
+    "trigger_encoded", "time_gap_min",
+    "HR", "MAP", "RR", "SPO2",
+    "hour_of_day", "is_night",
+    "patient_age", "gender_encoded",
+]
+
+missing = [f for f in FEATURES if f not in df.columns]
+if missing:
+    print("WARNING — missing features:", missing)
+else:
+    print("All 10 features present ✅")
+
+# ── Eligibility BEFORE dropna ─────────────────────────
+eligible = df.groupby("stay_id").filter(
+    lambda x: len(x) > SEQ_LEN
+)["stay_id"].unique()
+
+# NOW drop NaN delay rows
+df = df.dropna(subset=["delay_hours"])
+
+# ── Select stay ───────────────────────────────────────
+stay_id = 30000831
+
+if stay_id not in eligible:
+    stay_id = eligible[0]
+    print(f"Using stay: {stay_id}")
+
+print(f"\nSimulating Stay: {stay_id}")
+
+stay_df = df[df["stay_id"] == stay_id].reset_index(drop=True)
+
+print(f"Total triggers with valid delay: {len(stay_df)}\n")
+
+# ── Fallback for short delay-only stays ───────────────
+if len(stay_df) <= SEQ_LEN:
+    print("Not enough delay rows — using full stay for sequence.")
+
+    full_df      = pd.read_csv(DATA_PATH, parse_dates=["trigger_time"])
+    stay_full_df = full_df[
+        full_df["stay_id"] == stay_id
+    ].sort_values("trigger_time").reset_index(drop=True)
+
+    # Apply features
+    if "trigger_encoded" not in stay_full_df.columns:
+        trigger_map = {"HR_HIGH":0,"MAP_LOW":1,"SPO2_LOW":2,"RR_HIGH":3}
+        stay_full_df["trigger_encoded"] = stay_full_df[
+            "trigger_type"
+        ].map(trigger_map).fillna(-1).astype(int)
+
+    for col in vitals:
+        stay_full_df[col] = stay_full_df[col].fillna(
+            stay_full_df[col].median()
+        )
+
+    stay_full_df["time_gap_min"] = (
+        stay_full_df["trigger_time"]
+        .diff().dt.total_seconds() / 60
+    ).fillna(0).clip(0, 1440)
+
+    stay_full_df["hour_of_day"] = stay_full_df["trigger_time"].dt.hour
+    stay_full_df["is_night"]    = stay_full_df["hour_of_day"].apply(
+        lambda h: 1 if (h >= 22 or h <= 6) else 0
+    )
+
+    # is_weekend REMOVED
+    if "is_weekend" in stay_full_df.columns:
+        stay_full_df = stay_full_df.drop(columns=["is_weekend"])
+
+    stay_full_df["patient_age"]    = stay_full_df.get(
+        "patient_age", pd.Series([65]*len(stay_full_df))
+    ).fillna(65)
+    stay_full_df["gender_encoded"] = stay_full_df.get(
+        "gender_encoded", pd.Series([-1]*len(stay_full_df))
+    ).fillna(-1)
+
+    stay_df = stay_full_df
+    print(f"Using full stay: {len(stay_df)} triggers\n")
+
+# ── Run reactive graph ────────────────────────────────
+for i in range(SEQ_LEN, len(stay_df)):
+
+    row = stay_df.iloc[i]
+
+    if pd.isna(row["delay_hours"]):
+        continue
+
+    initial_state = {
+        "stay_id": stay_id,
+        "stay_df": stay_df,
+        "index":   i,
+    }
+
+    graph.invoke(initial_state)
+
+print("\nReactive Replay Comp# import torch
+# import torch.nn as nn
+# import numpy as np
+# import pickle
+# from datetime import timedelta
+# import os
+# import pandas as pd
+
+# BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, "..", ".."))
+
+# MODEL_PATH = os.path.join(PROJECT_ROOT, "data", "delay_lstm_model.pth")
+# SCALER_PATH = os.path.join(PROJECT_ROOT, "data", "scaler_lstm.pkl")
+
+
+# DATA_PATH = "/data/lstm_final_dataset.csv"
+
+# MODEL_PATH = "data/delay_lstm_model.pth"
+# SCALER_PATH = "data/scaler_lstm.pkl"
+
+# features_len = 6
+
+# class LSTMModel(nn.Module):
+#     def __init__(self):
+#         super().__init__()
+#         self.lstm = nn.LSTM(features_len, 64, 2,
+#                             batch_first=True, dropout=0.3)
+#         self.fc = nn.Linear(64, 1)
+
+#     def forward(self, x):
+#         out, _ = self.lstm(x)
+#         return self.fc(out[:, -1, :])
+
+# model = LSTMModel()
+# model.load_state_dict(torch.load(MODEL_PATH))
+# model.eval()
+
+# scaler = pickle.load(open(SCALER_PATH, "rb"))
+
+# def prediction_agent(state):
+#     print("[Prediction Agent]")
+
+ 
+
+#     features = [
+#     "episode_type",
+#     "time_gap_min",
+#     "HR",
+#     "MAP",
+#     "RR",
+#     "SPO2"
+#     ]
+
+#     seq_df = pd.DataFrame(state["sequence"], columns=features)
+#     seq_scaled = scaler.transform(seq_df)
+#     seq_tensor = torch.tensor(seq_scaled,
+#                               dtype=torch.float32).unsqueeze(0)
+
+#     with torch.no_grad():
+#         pred_log = model(seq_tensor).item()
+
+#     pred_min = np.expm1(pred_log)
+#     predicted_hours = pred_min / 60
+
+#     state["predicted_delay"] = predicted_hours
+#     state["deadline"] = (
+#         state["trigger_time"] +
+#         timedelta(hours=predicted_hours + 0.5)
+#     )
+
+#     print("Predicted Delay:", round(predicted_hours, 2), "hr")
+
+#     return state
+
+
+    # ======================================================
+# File: prediction_agent.py  [REACTIVE]
+# Changes: input_size 6 → 11
+#          hidden_size 64 → 128
+#          fc: Linear(64,1) → Sequential(128→64→ReLU→1)
+#          features list updated
+# ======================================================
+# ======================================================
+# File: prediction_agent.py  [REACTIVE]
+# Changes: is_weekend REMOVED — 10 features
+#          input_size 11 → 10
+# ======================================================
+
+import torch
+import torch.nn as nn
+import numpy as np
+import pickle
+import pandas as pd
+from datetime import timedelta
+import os
+
+BASE_DIR     = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, "..", ".."))
+
+MODEL_PATH  = os.path.join(PROJECT_ROOT, "data", "delay_lstm_model.pth")
+SCALER_PATH = os.path.join(PROJECT_ROOT, "data", "scaler_lstm.pkl")
+
+FEATURES = [
+    "trigger_encoded",
+    "time_gap_min",
+    "HR", "MAP", "RR", "SPO2",
+    "hour_of_day",
+    "is_night",
+    # is_weekend REMOVED
+    "patient_age",
+    "gender_encoded",
+]
+
+features_len = len(FEATURES)   # 10
+
+class LSTMModel(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.lstm = nn.LSTM(
+            input_size  = features_len,
+            hidden_size = 128,
+            num_layers  = 2,
+            batch_first = True,
+            dropout     = 0.3
+        )
+        self.fc = nn.Sequential(
+            nn.Linear(128, 64),
+            nn.ReLU(),
+            nn.Dropout(0.2),
+            nn.Linear(64, 1)
+        )
+
+    def forward(self, x):
+        out, _ = self.lstm(x)
+        return self.fc(out[:, -1, :])
+
+model = LSTMModel()
+model.load_state_dict(
+    torch.load(MODEL_PATH, map_location=torch.device("cpu"))
+)
+model.eval()
+
+scaler = pickle.load(open(SCALER_PATH, "rb"))
+
+def prediction_agent(state):
+    print("[Prediction Agent]")
+
+    seq_df     = pd.DataFrame(state["sequence"], columns=FEATURES)
+    seq_scaled = scaler.transform(seq_df)
+    seq_tensor = torch.tensor(
+        seq_scaled, dtype=torch.float32
+    ).unsqueeze(0)
+
+    with torch.no_grad():
+        pred_log = model(seq_tensor).item()
+
+    pred_min        = np.expm1(pred_log)
+    predicted_hours = pred_min / 60
+
+    state["predicted_delay"] = predicted_hours
+    state["deadline"] = (
+        state["trigger_time"] +
+        timedelta(hours=predicted_hours + 0.5)
+    )
+
+    print("Predicted Delay:", round(predicted_hours, 2), "hr")
+
+    return state
